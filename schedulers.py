@@ -17,6 +17,7 @@ from diffusers import (
 #用法
 #scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(scheduler_name, SCHEDULER_MAP["ddim"])
 #scheduler = scheduler_class.from_config(scheduler_config)
+#Multistep相比single step来说，后者是不需要迭代的
 SCHEDULER_MAP = dict(
     ddim=(DDIMScheduler, dict()),
     ddpm=(DDPMScheduler, dict()),

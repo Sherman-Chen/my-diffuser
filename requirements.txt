@@ -1,0 +1,6 @@
+opencv-contrib-python
+diffusers
+transformers
+git+https://github.com/huggingface/accelerate.git
+torchsde
+xformers
