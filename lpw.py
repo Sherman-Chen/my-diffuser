@@ -15,8 +15,13 @@ from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput, 
 from diffusers.utils import logging
 
 # 本文件参考：https://huggingface.co/poipii/lpw_high_res_fix_pipeline
+
 # 没有支持prompt中的lora注入功能，如果需要的话，可以参考：
 # https://github.com/VoltaML/voltaML-fast-stable-diffusion/blob/4babe5780ae393ef37b4202c6378f85f40679930/core/inference/utilities/lwp.py#L158
+
+# 另外也可以使用compel，参考：https://huggingface.co/docs/diffusers/using-diffusers/weighted_prompts
+
+
 
 
 try:
