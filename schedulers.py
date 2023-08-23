@@ -42,3 +42,11 @@ SCHEDULER_MAP = dict(
     dpmpp_sde_k=(DPMSolverSDEScheduler, dict(use_karras_sigmas=True, noise_sampler_seed=0)),
     unipc=(UniPCMultistepScheduler, dict(cpu_only=True)),
 )
+
+def getScheduler(name:str):
+    """
+    通过name获取采样器
+    """
+    scheduler_class, scheduler_extra_config = SCHEDULER_MAP.get(name, SCHEDULER_MAP["ddim"])
+    return scheduler_class.from_config(scheduler_extra_config)
+    

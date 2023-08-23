@@ -101,7 +101,7 @@ def getCannyImage(image, low_threshold: int = 100, high_threshold: int = 200):
     canny_image = Image.fromarray(canny_image)
 
 
-def make_inpaint_condition(image, image_mask):
+def makeInpaintCondition(image, image_mask):
     """
     使用原图和遮罩图，合成用于inpaint的图
 
