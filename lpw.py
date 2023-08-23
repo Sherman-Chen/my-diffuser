@@ -155,12 +155,16 @@ def parse_prompt_attention(text):
 
 def get_prompts_with_weights(pipe: StableDiffusionPipeline, prompt: List[str], max_length: int):
     r"""
+    返回每个单词的token id和对应的权重
     Tokenize a list of prompts and return its tokens with weights of each token.
     No padding, starting or ending token is included.
     """
     tokens = []
     weights = []
     truncated = False
+    #遍历所有的prompt,获取prompt中每一个词的权重：比如[['1girl',1.0],['solo',1.1]]
+    #然后将word使用pipe.tokenizer变为token，然后去掉头尾token，拼接到text_token中
+    #而将权重拼接到text_weight中
     for text in prompt:
         texts_and_weights = parse_prompt_attention(text)
         text_token = []
@@ -169,13 +173,14 @@ def get_prompts_with_weights(pipe: StableDiffusionPipeline, prompt: List[str], m
             # tokenize and discard the starting and the ending token
             token = pipe.tokenizer(word).input_ids[1:-1]
             text_token += token
-            # copy the weight by length of token
+            #一个word变成token之后，长度并不是1，有可能多个token
+            #这里是将每一个token都放大weight倍
             text_weight += [weight] * len(token)
-            # stop if the text is too long (longer than truncation limit)
+            # 不能超过最大的长度
             if len(text_token) > max_length:
                 truncated = True
                 break
-        # truncate
+        # 不能超过最大的长度
         if len(text_token) > max_length:
             truncated = True
             text_token = text_token[:max_length]
@@ -272,22 +277,25 @@ def get_weighted_text_embeddings(
         prompt (`str` or `List[str]`):
             The prompt or prompts to guide the image generation.
         uncond_prompt (`str` or `List[str]`):
-            The unconditional prompt or prompts for guide the image generation. If unconditional prompt
-            is provided, the embeddings of prompt and uncond_prompt are concatenated.
+            负提示. 将会和prompt拼接
         max_embeddings_multiples (`int`, *optional*, defaults to `3`):
-            The max multiple length of prompt embeddings compared to the max output length of text encoder.
+            放大到倍数
         no_boseos_middle (`bool`, *optional*, defaults to `False`):
             If the length of text token is multiples of the capacity of text encoder, whether reserve the starting and
             ending token in each of the chunk in the middle.
         skip_parsing (`bool`, *optional*, defaults to `False`):
-            Skip the parsing of brackets.
+            跳过括号的解析
         skip_weighting (`bool`, *optional*, defaults to `False`):
             Skip the weighting. When the parsing is skipped, it is forced True.
     """
+    #sd的token限制为77，我们去掉头尾token，再*放大到倍数，便可以得到最大的token长度是多少
+    #+2表示加上头尾
     max_length = (pipe.tokenizer.model_max_length - 2) * max_embeddings_multiples + 2
     if isinstance(prompt, str):
         prompt = [prompt]
-
+    
+    # 获取prompt和negative_prompt的token id和权重
+    # skip_parsing=true，则会解析括号对应的权重，否则权重都为1
     if not skip_parsing:
         prompt_tokens, prompt_weights = get_prompts_with_weights(pipe, prompt, max_length - 2)
         if uncond_prompt is not None:
@@ -312,15 +320,28 @@ def get_weighted_text_embeddings(
     max_length = max([len(token) for token in prompt_tokens])
     if uncond_prompt is not None:
         max_length = max(max_length, max([len(token) for token in uncond_tokens]))
-
+    # pipe.tokenizer.model_max_length表示token支持的最大输入长度
+    # -2表示去掉头尾
+    # (max_length - 1) // (pipe.tokenizer.model_max_length - 2) + 1是为了获得实际的分段数
+    # +1则是为了向上取整，为了弥补这个+1，会将max_length-1表示预留1个token放在最后，这样就能得到实际的分段数
+    # 比如max_length=75，如果不进行-1，则75 // (77-2) + 1 = 2，多出了1个段
+    # (75 - 1) // (77-2) + 1 = 1
     max_embeddings_multiples = min(
         max_embeddings_multiples,
         (max_length - 1) // (pipe.tokenizer.model_max_length - 2) + 1,
     )
     max_embeddings_multiples = max(1, max_embeddings_multiples)
+    # 重新使用分段数，计算出最大的长度
     max_length = (pipe.tokenizer.model_max_length - 2) * max_embeddings_multiples + 2
+    #上面计算的max_length，这里再计算一次
+    # 第一次max_length表示预留的最大长度，不能超过预留最大的长度
+    # 第二次max_length则表示实际的最大长度
+    # 比如输入prompt，进行token之后是小于75，那么max_length则能直接可以变成77
 
     # pad the length of tokens and weights
+    # Beginning of Sequence：表示开头的标记
+    # End of Sequence：表示结尾的标记
+    # 有pad token id则获取，没有的话使用eos代替
     bos = pipe.tokenizer.bos_token_id
     eos = pipe.tokenizer.eos_token_id
     pad = getattr(pipe.tokenizer, "pad_token_id", eos)
